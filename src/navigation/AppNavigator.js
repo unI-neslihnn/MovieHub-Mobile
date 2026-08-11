@@ -3,32 +3,32 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
-// Ekranlarımız
+// Ekranlar
 import WelcomeScreen from '../screens/WelcomeScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
+import WatchlistScreen from '../screens/WatchlistScreen';
 import DetailScreen from '../screens/DetailScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// 1. Alt Menü Yapısı (Bottom Tabs)
 function MainTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#E50914', // Aktif sekme rengi (Kırmızı)
-        tabBarInactiveTintColor: '#888888', // Pasif sekme rengi
+        tabBarActiveTintColor: '#E50914',
+        tabBarInactiveTintColor: '#888888',
         tabBarStyle: {
-          backgroundColor: '#121212', // Koyu tema arka planı
+          backgroundColor: '#121212',
           borderTopWidth: 0,
           height: 60,
           paddingBottom: 8,
           paddingTop: 6,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, color }) => {
           let iconName;
 
           if (route.name === 'HomeScreen') {
@@ -37,12 +37,14 @@ function MainTabNavigator() {
             iconName = focused ? 'search' : 'search-outline';
           } else if (route.name === 'FavoritesScreen') {
             iconName = focused ? 'heart' : 'heart-outline';
+          } else if (route.name === 'WatchlistScreen') {
+            iconName = focused ? 'bookmark' : 'bookmark-outline';
           }
 
           return <Ionicons name={iconName} size={22} color={color} />;
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
         },
       })}
@@ -62,24 +64,23 @@ function MainTabNavigator() {
         component={FavoritesScreen}
         options={{ tabBarLabel: 'Favoriler' }}
       />
+      <Tab.Screen
+        name="WatchlistScreen"
+        component={WatchlistScreen}
+        options={{ tabBarLabel: 'İzlenecekler' }}
+      />
     </Tab.Navigator>
   );
 }
 
-// 2. Ana Navigasyon Akışı (Stack Navigator)
 export default function AppNavigator() {
   return (
     <Stack.Navigator
       initialRouteName="Welcome"
       screenOptions={{ headerShown: false }}
     >
-      {/* Karşılama / Giriş Ekranı (Alt bar görünmez) */}
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
-
-      {/* Ana Uygulama Yapısı (Alt bar görünür) */}
       <Stack.Screen name="Home" component={MainTabNavigator} />
-
-      {/* Detay Ekranı */}
       <Stack.Screen name="Detail" component={DetailScreen} />
     </Stack.Navigator>
   );

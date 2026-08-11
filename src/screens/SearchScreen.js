@@ -1,39 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
-  SafeAreaView,
+  TextInput,
   FlatList,
+  TouchableOpacity,
+  Image,
+  ImageBackground,
   ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { searchMovies } from '../api/tmdb';
-import MovieCard from '../components/MovieCard';
+import { IMAGE_BASE_URL } from '../constants/config';
+import axios from 'axios';
+import { BASE_URL, API_KEY } from '../constants/config';
 
 export default function SearchScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
 
-  // Arama metni değiştiğinde sıfırdan arama yap
+  // TMDB Film Arama Fonksiyonu
   const handleSearch = async (text) => {
     setQuery(text);
-    if (text.trim().length === 0) {
+    if (text.trim().length < 2) {
       setResults([]);
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-      setPage(1); // Sayfayı sıfırla
-      const data = await searchMovies(text, 1);
-      setResults(data.results || []);
-      setTotalPages(data.total_pages || 1);
+      const response = await axios.get(`${BASE_URL}/search/movie`, {
+        params: {
+          api_key: API_KEY,
+          query: text,
+          language: 'tr-TR',
+        },
+      });
+      setResults(response.data.results || []);
     } catch (error) {
       console.error('Arama hatası:', error);
     } finally {
@@ -41,146 +48,201 @@ export default function SearchScreen({ navigation }) {
     }
   };
 
-  // Sonsuz Scroll (Infinite Scroll) - Sayfa Altına Gelindiğinde Tetiklenir
-  const loadMoreData = async () => {
-    // Eğer zaten yükleniyorsa veya son sayfaya geldiysek veya arama kutusu boşsa çalışma
-    if (loadingMore || page >= totalPages || query.trim().length === 0) {
-      return;
-    }
-
-    try {
-      setLoadingMore(true);
-      const nextPage = page + 1;
-      const data = await searchMovies(query, nextPage);
-      
-      // Eski verilerin üzerine yeni gelenleri ekle
-      setResults((prevResults) => [...prevResults, ...(data.results || [])]);
-      setPage(nextPage);
-    } catch (error) {
-      console.error('Daha fazla veri çekilemedi:', error);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  // Alt Kısımda Yükleniyor Simgesi Render Eden Fonksiyon
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#E50914" />
+  const renderMovieItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate('Detail', { movie: item })}
+    >
+      <Image
+        source={{
+          uri: item.poster_path
+            ? `${IMAGE_BASE_URL}${item.poster_path}`
+            : 'https://via.placeholder.com/150x225/111/fff?text=Görsel+Yok',
+        }}
+        style={styles.poster}
+      />
+      <View style={styles.infoContainer}>
+        <Text style={styles.title} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.date}>
+          {item.release_date ? item.release_date.split('-')[0] : 'Tarih Yok'}
+        </Text>
+        <Text style={styles.overview} numberOfLines={2}>
+          {item.overview || 'Açıklama bulunmuyor.'}
+        </Text>
+        <Text style={styles.rating}>⭐ {item.vote_average?.toFixed(1) || 'N/A'}</Text>
       </View>
-    );
-  };
+    </TouchableOpacity>
+  );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Arama Barı */}
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#888" style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.input}
-            placeholder="Film veya dizi ara..."
-            placeholderTextColor="#888"
-            value={query}
-            onChangeText={handleSearch}
-          />
-          {query.length > 0 && (
-            <Ionicons
-              name="close-circle"
-              size={20}
-              color="#888"
-              onPress={() => handleSearch('')}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <SafeAreaView style={styles.container}>
+        
+        {/* Arama Alanı (Üstten biraz mesafe bırakarak konumlandırıldı) */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Film, dizi veya oyuncu ara..."
+              placeholderTextColor="#888"
+              value={query}
+              onChangeText={handleSearch}
             />
-          )}
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => handleSearch('')}>
+                <Ionicons name="close-circle" size={20} color="#888" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
-        {/* Sonuç Listesi */}
+        {/* Sonuç Alanı VEYA Silik Sinema Arka Planı */}
         {loading ? (
-          <View style={styles.centerLoader}>
+          <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#E50914" />
           </View>
-        ) : results.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="film-outline" size={60} color="#444" />
-            <Text style={styles.emptyText}>
-              {query.length > 0
-                ? 'Aradığınız içerik bulunamadı.'
-                : 'Aramak istediğiniz film veya dizinin adını yazın.'}
-            </Text>
-          </View>
-        ) : (
+        ) : results.length > 0 ? (
           <FlatList
             data={results}
-            numColumns={2} // 2'li Grid Sıralama
-            columnWrapperStyle={styles.rowWrapper}
-            keyExtractor={(item, index) => `${item.id}-${index}`}
-            renderItem={({ item }) => (
-              <MovieCard
-                item={item}
-                isHorizontal={false}
-                onPress={() => navigation.navigate('Detail', { movieId: item.id })}
-              />
-            )}
-            onEndReached={loadMoreData} // Listenin sonuna gelindiğinde çalışır
-            onEndReachedThreshold={0.5} // Listenin %50'sine gelince yeni sayfayı tetikler
-            ListFooterComponent={renderFooter} // En alta yükleme simgesi koyar
-            showsVerticalScrollIndicator={false}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderMovieItem}
+            contentContainerStyle={styles.listContainer}
+            keyboardShouldPersistTaps="handled"
           />
+        ) : (
+          /* Arama Yapılmadığında Görünen Silik Sinema Teması */
+          <View style={styles.emptyContainer}>
+            <ImageBackground
+              source={{
+                uri: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1000&auto=format&fit=crop',
+              }}
+              style={styles.backgroundImage}
+              imageStyle={styles.backgroundImageStyle}
+            >
+              <View style={styles.emptyOverlay}>
+                <Ionicons name="film-outline" size={70} color="rgba(229, 9, 20, 0.6)" />
+                <Text style={styles.emptyTitle}>Sinema Dünyasında Ara</Text>
+                <Text style={styles.emptySubtitle}>
+                  Binlerce film arasından dilediğini bulmak için yukarıdaki arama çubuğunu kullanabilirsin.
+                </Text>
+              </View>
+            </ImageBackground>
+          </View>
         )}
-      </View>
-    </SafeAreaView>
+
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: '#121212',
   },
-  container: {
-    flex: 1,
+  searchSection: {
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 24, // Arama barını en üstten biraz aşağıya indiren kısım
+    paddingBottom: 12,
   },
-  searchBar: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1E1E1E',
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    height: 50,
-    marginBottom: 16,
+    height: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   input: {
     flex: 1,
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
   },
-  rowWrapper: {
-    justifyContent: 'space-between',
-  },
-  centerLoader: {
+  centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
+  card: {
+    flexDirection: 'row',
+    backgroundColor: '#1E1E1E',
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  poster: {
+    width: 80,
+    height: 120,
+  },
+  infoContainer: {
+    flex: 1,
+    padding: 12,
+  },
+  title: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  date: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  overview: {
+    color: '#AAA',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  rating: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // Silik Arka Plan Görseli Stilleri
   emptyContainer: {
     flex: 1,
+    marginTop: 10,
+  },
+  backgroundImage: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: -50,
   },
-  emptyText: {
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 12,
-    fontSize: 14,
-    paddingHorizontal: 20,
+  backgroundImageStyle: {
+    opacity: 0.18, // Görseli silikleştiren ayar (0.18)
+    resizeMode: 'cover',
   },
-  footerLoader: {
-    paddingVertical: 20,
+  emptyOverlay: {
     alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#888',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
