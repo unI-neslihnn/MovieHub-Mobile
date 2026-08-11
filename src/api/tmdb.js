@@ -1,16 +1,14 @@
 import axios from 'axios';
 import { BASE_URL, API_KEY } from '../constants/config';
 
-// Axios istemcisi (Varsayılan ayarlar)
 const tmdbApi = axios.create({
   baseURL: BASE_URL,
   params: {
     api_key: API_KEY,
-    language: 'tr-TR', // Türkçe veri çekimi
+    language: 'tr-TR',
   },
 });
 
-// 1. Trend Filmleri Getir (Ana Sayfa İçin)
 export const getTrendingMovies = async () => {
   try {
     const response = await tmdbApi.get('/trending/movie/day');
@@ -21,13 +19,10 @@ export const getTrendingMovies = async () => {
   }
 };
 
-// 2. Popüler Dizileri Getir (Sayfalamalı / Infinite Scroll Uyumlu)
 export const getPopularTvShows = async (page = 1) => {
   try {
     const response = await tmdbApi.get('/tv/popular', {
-      params: {
-        page: page,
-      },
+      params: { page },
     });
     return response.data;
   } catch (error) {
@@ -36,23 +31,36 @@ export const getPopularTvShows = async (page = 1) => {
   }
 };
 
-// 3. Sayfalamalı (Paginated) Film Arama (SearchScreen İçin)
-export const searchMovies = async (query, page = 1) => {
+export const searchMulti = async (query, page = 1) => {
   try {
-    const response = await tmdbApi.get('/search/movie', {
-      params: {
-        query: query,
-        page: page,
-      },
+    const response = await tmdbApi.get('/search/multi', {
+      params: { query, page },
     });
     return response.data;
   } catch (error) {
-    console.error('searchMovies hatası:', error);
+    console.error('searchMulti hatası:', error);
     throw error;
   }
 };
 
-// 4. Film Detay Bilgisini Getir (DetailScreen İçin)
+export const getMoviesByGenre = async (genreId, page = 1) => {
+  try {
+    const response = await tmdbApi.get('/discover/movie', {
+      params: {
+        with_genres: genreId,
+        page: page,
+        sort_by: 'vote_average.desc', 
+        'vote_count.gte': 1500,       
+        include_adult: false,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('getMoviesByGenre hatası:', error);
+    return { results: [] };
+  }
+};
+
 export const getMovieDetails = async (movieId) => {
   try {
     const response = await tmdbApi.get(`/movie/${movieId}`);
@@ -63,13 +71,24 @@ export const getMovieDetails = async (movieId) => {
   }
 };
 
-// 5. Film Oyuncu Kadrosunu (Cast) Getir (DetailScreen İçin)
 export const getMovieCredits = async (movieId) => {
   try {
     const response = await tmdbApi.get(`/movie/${movieId}/credits`);
-    return response.data;
+    return response.data.cast;
   } catch (error) {
     console.error('getMovieCredits hatası:', error);
     throw error;
   }
 };
+
+export const getMovieVideos = async (movieId) => {
+  try {
+    const response = await tmdbApi.get(`/movie/${movieId}/videos`);
+    return response.data.results;
+  } catch (error) {
+    console.error('getMovieVideos hatası:', error);
+    throw error;
+  }
+};
+
+export default tmdbApi;

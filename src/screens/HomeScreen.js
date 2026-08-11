@@ -1,172 +1,222 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
-import { getTrendingMovies, getPopularTvShows } from '../api/tmdb';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  getTrendingMovies,
+  getPopularTvShows,
+  getMoviesByGenre,
+} from '../api/tmdb';
 import MovieCard from '../components/MovieCard';
 import Skeleton from '../components/Skeleton';
 
-export default function HomeScreen({ navigation }) {
-  const [trendingMovies, setTrendingMovies] = useState([]);
-  const [popularTv, setPopularTv] = useState([]);
-  const [tvPage, setTvPage] = useState(1);
+const CategoryRow = ({ title, fetchFn, mediaType, navigation }) => {
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const onEndReachedCalledDuringMomentum = useRef(true);
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-  const fetchData = async () => {
+  const loadInitialData = async () => {
     try {
       setLoading(true);
-      setTvPage(1);
-      const [moviesRes, tvRes] = await Promise.all([
-        getTrendingMovies(),
-        getPopularTvShows(1),
-      ]);
-      setTrendingMovies(moviesRes.results || []);
-      setPopularTv(tvRes.results || []);
-      setHasMore(tvRes.page < tvRes.total_pages);
+      const res = await fetchFn(1);
+      const results = res?.results || (Array.isArray(res) ? res : []);
+      setItems(results);
+      setPage(1);
+      setHasMore(res?.page < res?.total_pages);
     } catch (error) {
-      console.error('Ana sayfa verileri çekilemedi:', error);
+      console.error(`${title} verileri çekilemedi:`, error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const loadMoreTvShows = async () => {
-    if (onEndReachedCalledDuringMomentum.current || loadingMore || !hasMore) {
-      return;
-    }
+  const loadMoreData = async () => {
+    if (loadingMore || !hasMore) return;
 
     try {
       setLoadingMore(true);
-      onEndReachedCalledDuringMomentum.current = true;
-
-      const nextPage = tvPage + 1;
-      const tvRes = await getPopularTvShows(nextPage);
-      const newItems = tvRes.results || [];
+      const nextPage = page + 1;
+      const res = await fetchFn(nextPage);
+      const newItems = res?.results || (Array.isArray(res) ? res : []);
 
       if (newItems.length > 0) {
-        setPopularTv((prevTv) => {
-          const existingIds = new Set(prevTv.map((item) => item.id));
+        setItems((prevItems) => {
+          const existingIds = new Set(prevItems.map((item) => item.id));
           const filteredNewItems = newItems.filter((item) => !existingIds.has(item.id));
-          return [...prevTv, ...filteredNewItems];
+          return [...prevItems, ...filteredNewItems];
         });
-        setTvPage(nextPage);
-        setHasMore(nextPage < tvRes.total_pages);
+        setPage(nextPage);
+        setHasMore(res?.page < res?.total_pages);
       } else {
         setHasMore(false);
       }
     } catch (error) {
-      console.error('Daha fazla dizi çekilemedi:', error);
+      console.error(`${title} için daha fazla veri çekilemedi:`, error);
     } finally {
       setLoadingMore(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData();
-  };
-
-  const renderHeader = () => (
-    <>
-      {/* Birebir Marvel Tasarımlı Logo */}
-      <View style={styles.header}>
-        <View style={styles.marvelBox}>
-          <Text style={styles.marvelText}>MOVIEHUB</Text>
+  if (loading) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={{ flexDirection: 'row', paddingLeft: 16 }}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} width={130} height={190} style={{ marginRight: 12 }} />
+          ))}
         </View>
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🔥 Trend Filmler</Text>
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={trendingMovies}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <MovieCard
-              item={item}
-              isHorizontal={true}
-              onPress={() => navigation.navigate('Detail', { movieId: item.id })}
-            />
-          )}
-        />
-      </View>
-
-      <Text style={styles.sectionTitle}>📺 Popüler Diziler</Text>
-    </>
-  );
-
-  const renderFooter = () => {
-    if (!loadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#E50914" />
-      </View>
     );
-  };
+  }
 
-  const renderSkeletons = () => (
-    <View style={styles.skeletonContainer}>
-      <View style={{ flexDirection: 'row', marginBottom: 20 }}>
-        {[1, 2, 3].map((_, i) => (
-          <Skeleton key={i} width={140} height={210} style={{ marginRight: 12 }} />
-        ))}
-      </View>
-      <View style={styles.gridSkeleton}>
-        {[1, 2, 3, 4].map((_, i) => (
-          <Skeleton key={i} width="48%" height={250} style={{ marginBottom: 16 }} />
-        ))}
-      </View>
+  if (items.length === 0) return null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={items}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={{ paddingLeft: 16 }}
+        renderItem={({ item }) => (
+          <MovieCard
+            item={item}
+            isHorizontal={true}
+            onPress={() =>
+              navigation.navigate('Detail', {
+                movieId: item.id,
+                mediaType: mediaType,
+              })
+            }
+          />
+        )}
+        onEndReached={loadMoreData}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.rowLoader}>
+              <ActivityIndicator size="small" color="#E50914" />
+            </View>
+          ) : null
+        }
+      />
     </View>
   );
+};
+
+export default function HomeScreen({ navigation }) {
+  const SECTIONS = [
+    {
+      id: 'trending',
+      title: 'Trend Filmler',
+      mediaType: 'movie',
+      fetchFn: async () => await getTrendingMovies(),
+    },
+    {
+      id: 'popular_tv',
+      title: 'Popüler Diziler',
+      mediaType: 'tv',
+      fetchFn: async (page) => await getPopularTvShows(page),
+    },
+    {
+      id: 'action',
+      title: 'Aksiyon',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(28, page),
+    },
+    {
+      id: 'adventure',
+      title: 'Macera',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(12, page),
+    },
+    {
+      id: 'animation',
+      title: 'Animasyon',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(16, page),
+    },
+    {
+      id: 'scifi',
+      title: 'Bilim Kurgu',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(878, page),
+    },
+    {
+      id: 'comedy',
+      title: 'Komedi',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(35, page),
+    },
+    {
+      id: 'crime',
+      title: 'Suç ve Polisiye',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(80, page),
+    },
+    {
+      id: 'drama',
+      title: 'Dram',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(18, page),
+    },
+    {
+      id: 'fantasy',
+      title: 'Fantastik',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(14, page),
+    },
+    {
+      id: 'horror',
+      title: 'Korku',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(27, page),
+    },
+    {
+      id: 'romance',
+      title: 'Romantik',
+      mediaType: 'movie',
+      fetchFn: async (page) => await getMoviesByGenre(10749, page),
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {loading ? (
-          renderSkeletons()
-        ) : (
-          <FlatList
-            data={popularTv}
-            numColumns={2}
-            columnWrapperStyle={styles.rowWrapper}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <MovieCard
-                item={item}
-                isHorizontal={false}
-                onPress={() => navigation.navigate('Detail', { movieId: item.id })}
-              />
-            )}
-            ListHeaderComponent={renderHeader}
-            ListFooterComponent={renderFooter}
-            onEndReached={loadMoreTvShows}
-            onEndReachedThreshold={0.5}
-            onMomentumScrollBegin={() => {
-              onEndReachedCalledDuringMomentum.current = false;
-            }}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E50914" />
-            }
-          />
-        )}
+        <View style={styles.header}>
+          <View style={styles.marvelBox}>
+            <Text style={styles.marvelText}>MOVIEHUB</Text>
+          </View>
+        </View>
+
+        <FlatList
+          data={SECTIONS}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          renderItem={({ item }) => (
+            <CategoryRow
+              title={item.title}
+              fetchFn={item.fetchFn}
+              mediaType={item.mediaType}
+              navigation={navigation}
+            />
+          )}
+        />
       </View>
     </SafeAreaView>
   );
@@ -175,54 +225,46 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#1A0609',
   },
   container: {
     flex: 1,
-    paddingHorizontal: 16,
   },
   header: {
-    paddingTop: 25,
-    paddingVertical: 12,
+    paddingTop: 15,
+    paddingBottom: 15,
+    paddingHorizontal: 16,
     alignItems: 'flex-start',
+    backgroundColor: '#1A0609',
   },
-  // Doğrudan kutucuğun boyutunu ve kavisini ayarladığımız alan:
   marvelBox: {
     backgroundColor: '#E50914',
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4, // İstediğin tatlı köşe kavisi
-    alignSelf: 'flex-start', // Kutuyu ekrana yaymaz, sadece içeriği kadar tutar
+    borderRadius: 4,
   },
   marvelText: {
     color: '#FFFFFF',
-    fontSize: 18, // Kutunun boyutunu belirleyen ana metin ölçeği
+    fontSize: 18,
     fontWeight: '900',
     letterSpacing: -1,
     textTransform: 'uppercase',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#FFF',
     marginBottom: 12,
+    paddingHorizontal: 16,
   },
-  rowWrapper: {
-    justifyContent: 'space-between',
-  },
-  footerLoader: {
-    paddingVertical: 20,
+  rowLoader: {
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  skeletonContainer: {
-    marginTop: 10,
-  },
-  gridSkeleton: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    width: 60,
+    height: 190,
+    marginRight: 16,
   },
 });

@@ -19,7 +19,6 @@ export default function WelcomeScreen({ navigation }) {
   const [secureText, setSecureText] = useState(true);
 
   const handleLogin = () => {
-    // Tıklandığı an direkt Home ekranına geçiş yapar
     navigation.navigate('Home');
   };
 
@@ -37,21 +36,18 @@ export default function WelcomeScreen({ navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
               >
-                {/* Logo */}
                 <View style={styles.logoContainer}>
                   <View style={styles.marvelBox}>
                     <Text style={styles.marvelText}>MOVIEHUB</Text>
                   </View>
                 </View>
 
-                {/* Form Alanı */}
                 <View style={styles.formContainer}>
                   <Text style={styles.title}>Hoş Geldiniz</Text>
                   <Text style={styles.subtitle}>
                     Filmleri keşfetmek için giriş yapın
                   </Text>
 
-                  {/* Kullanıcı Adı */}
                   <View style={styles.inputContainer}>
                     <TextInput
                       style={styles.input}
@@ -63,7 +59,6 @@ export default function WelcomeScreen({ navigation }) {
                     />
                   </View>
 
-                  {/* Şifre */}
                   <View style={styles.inputContainer}>
                     <TextInput
                       style={styles.input}
@@ -83,7 +78,6 @@ export default function WelcomeScreen({ navigation }) {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Giriş Yap Butonu */}
                   <TouchableOpacity
                     style={styles.button}
                     activeOpacity={0.8}

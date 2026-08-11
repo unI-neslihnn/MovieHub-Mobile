@@ -14,16 +14,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { IMAGE_BASE_URL } from '../constants/config';
+import { IMAGE_BASE_URL, BASE_URL, API_KEY } from '../constants/config';
 import axios from 'axios';
-import { BASE_URL, API_KEY } from '../constants/config';
 
 export default function SearchScreen({ navigation }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // TMDB Film Arama Fonksiyonu
   const handleSearch = async (text) => {
     setQuery(text);
     if (text.trim().length < 2) {
@@ -33,14 +31,18 @@ export default function SearchScreen({ navigation }) {
 
     setLoading(true);
     try {
-      const response = await axios.get(`${BASE_URL}/search/movie`, {
+      const response = await axios.get(`${BASE_URL}/search/multi`, {
         params: {
           api_key: API_KEY,
           query: text,
           language: 'tr-TR',
         },
       });
-      setResults(response.data.results || []);
+
+      const filteredResults = (response.data.results || []).filter(
+        (item) => item.poster_path || item.profile_path || item.backdrop_path
+      );
+      setResults(filteredResults);
     } catch (error) {
       console.error('Arama hatası:', error);
     } finally {
@@ -48,40 +50,69 @@ export default function SearchScreen({ navigation }) {
     }
   };
 
-  const renderMovieItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.8}
-      onPress={() => navigation.navigate('Detail', { movie: item })}
-    >
-      <Image
-        source={{
-          uri: item.poster_path
-            ? `${IMAGE_BASE_URL}${item.poster_path}`
-            : 'https://via.placeholder.com/150x225/111/fff?text=Görsel+Yok',
+  const renderSearchItem = ({ item }) => {
+    const isMovie = item.media_type === 'movie';
+    const isTv = item.media_type === 'tv';
+    const isPerson = item.media_type === 'person';
+
+    const title = item.title || item.name || 'İsimsiz İçerik';
+    const imagePath = isPerson ? item.profile_path : item.poster_path;
+
+    const dateInfo = isMovie
+      ? item.release_date ? item.release_date.split('-')[0] : 'Tarih Yok'
+      : isTv
+      ? item.first_air_date ? item.first_air_date.split('-')[0] : 'Tarih Yok'
+      : item.known_for_department || 'Oyuncu/Kişi';
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.8}
+        onPress={() => {
+          if (isMovie || isTv) {
+            navigation.navigate('Detail', {
+              movieId: item.id,
+              mediaType: isTv ? 'tv' : 'movie',
+            });
+          }
         }}
-        style={styles.poster}
-      />
-      <View style={styles.infoContainer}>
-        <Text style={styles.title} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.date}>
-          {item.release_date ? item.release_date.split('-')[0] : 'Tarih Yok'}
-        </Text>
-        <Text style={styles.overview} numberOfLines={2}>
-          {item.overview || 'Açıklama bulunmuyor.'}
-        </Text>
-        <Text style={styles.rating}>⭐ {item.vote_average?.toFixed(1) || 'N/A'}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+      >
+        <Image
+          source={{
+            uri: imagePath
+              ? `${IMAGE_BASE_URL}${imagePath}`
+              : 'https://via.placeholder.com/150x225/111/fff?text=Görsel+Yok',
+          }}
+          style={styles.poster}
+        />
+        <View style={styles.infoContainer}>
+          <View style={styles.badgeContainer}>
+            <Text style={styles.badgeText}>
+              {isMovie ? '🎬 Film' : isTv ? '📺 Dizi' : '👤 Oyuncu'}
+            </Text>
+          </View>
+
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <Text style={styles.date}>{dateInfo}</Text>
+
+          {!isPerson && (
+            <>
+              <Text style={styles.overview} numberOfLines={2}>
+                {item.overview || 'Açıklama bulunmuyor.'}
+              </Text>
+              <Text style={styles.rating}>
+                ⭐ {item.vote_average ? item.vote_average.toFixed(1) : 'N/A'}
+              </Text>
+            </>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <SafeAreaView style={styles.container}>
-        
-        {/* Arama Alanı (Üstten biraz mesafe bırakarak konumlandırıldı) */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
@@ -100,7 +131,6 @@ export default function SearchScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Sonuç Alanı VEYA Silik Sinema Arka Planı */}
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color="#E50914" />
@@ -108,13 +138,13 @@ export default function SearchScreen({ navigation }) {
         ) : results.length > 0 ? (
           <FlatList
             data={results}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderMovieItem}
+            keyExtractor={(item) => `${item.media_type}-${item.id}`}
+            renderItem={renderSearchItem}
             contentContainerStyle={styles.listContainer}
             keyboardShouldPersistTaps="handled"
           />
         ) : (
-          /* Arama Yapılmadığında Görünen Silik Sinema Teması */
+
           <View style={styles.emptyContainer}>
             <ImageBackground
               source={{
@@ -127,122 +157,47 @@ export default function SearchScreen({ navigation }) {
                 <Ionicons name="film-outline" size={70} color="rgba(229, 9, 20, 0.6)" />
                 <Text style={styles.emptyTitle}>Sinema Dünyasında Ara</Text>
                 <Text style={styles.emptySubtitle}>
-                  Binlerce film arasından dilediğini bulmak için yukarıdaki arama çubuğunu kullanabilirsin.
+                  Binlerce film, dizi ve oyuncu arasından dilediğini bulmak için yukarıdaki arama çubuğunu kullanabilirsin.
                 </Text>
               </View>
             </ImageBackground>
           </View>
         )}
-
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  searchSection: {
-    paddingHorizontal: 16,
-    paddingTop: 24, // Arama barını en üstten biraz aşağıya indiren kısım
-    paddingBottom: 12,
-  },
+  container: { flex: 1, backgroundColor: '#1A0609' },
+  searchSection: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 12 },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 48,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1E1E1E',
+    borderRadius: 10, paddingHorizontal: 12, height: 48, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    fontSize: 15,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
+  searchIcon: { marginRight: 8 },
+  input: { flex: 1, color: '#FFF', fontSize: 15 },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  listContainer: { paddingHorizontal: 16, paddingBottom: 20 },
   card: {
-    flexDirection: 'row',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
-    alignItems: 'center',
+    flexDirection: 'row', backgroundColor: '#1E1E1E', borderRadius: 8,
+    marginBottom: 12, overflow: 'hidden', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)',
   },
-  poster: {
-    width: 80,
-    height: 120,
+  poster: { width: 85, height: 125 },
+  infoContainer: { flex: 1, padding: 12 },
+  badgeContainer: {
+    alignSelf: 'flex-start', backgroundColor: 'rgba(229, 9, 20, 0.2)', paddingHorizontal: 8,
+    paddingVertical: 2, borderRadius: 4, marginBottom: 6, borderWidth: 1, borderColor: 'rgba(229, 9, 20, 0.5)',
   },
-  infoContainer: {
-    flex: 1,
-    padding: 12,
-  },
-  title: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  date: {
-    color: '#888',
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  overview: {
-    color: '#AAA',
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  rating: {
-    color: '#FFD700',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  // Silik Arka Plan Görseli Stilleri
-  emptyContainer: {
-    flex: 1,
-    marginTop: 10,
-  },
-  backgroundImage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backgroundImageStyle: {
-    opacity: 0.18, // Görseli silikleştiren ayar (0.18)
-    resizeMode: 'cover',
-  },
-  emptyOverlay: {
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: '#888',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  badgeText: { color: '#E50914', fontSize: 11, fontWeight: 'bold' },
+  title: { color: '#FFF', fontSize: 15, fontWeight: 'bold', marginBottom: 2 },
+  date: { color: '#888', fontSize: 12, marginBottom: 4 },
+  overview: { color: '#AAA', fontSize: 12, marginBottom: 6 },
+  rating: { color: '#FFD700', fontSize: 13, fontWeight: '600' },
+  emptyContainer: { flex: 1 },
+  backgroundImage: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  backgroundImageStyle: { opacity: 0.45, resizeMode: 'cover' },
+  emptyOverlay: { alignItems: 'center', paddingHorizontal: 40 },
+  emptyTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold', marginTop: 16, marginBottom: 8, textAlign: 'center' },
+  emptySubtitle: { color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 20 },
 });

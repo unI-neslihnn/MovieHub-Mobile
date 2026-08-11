@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   verticalCard: {
-    width: '48%', // Ekranın %48'ini kaplar, 2 tanesi yan yana oturur
+    width: '48%', 
   },
   poster: {
     width: '100%',

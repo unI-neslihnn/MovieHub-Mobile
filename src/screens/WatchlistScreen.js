@@ -16,7 +16,6 @@ import { Ionicons } from '@expo/vector-icons';
 export default function WatchlistScreen({ navigation }) {
   const [watchlist, setWatchlist] = useState([]);
 
-  // Sayfaya her odaklanıldığında listeyi AsyncStorage'dan güncel olarak çek
   useFocusEffect(
     useCallback(() => {
       loadWatchlist();
@@ -81,7 +80,7 @@ export default function WatchlistScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.headerTitle}>İzlenecekler Listem 📌</Text>
+      <Text style={styles.headerTitle}>İzlenecekler Listem </Text>
 
       {watchlist.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -103,7 +102,7 @@ export default function WatchlistScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#1A0609',
     paddingHorizontal: 16,
   },
   headerTitle: {
